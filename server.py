@@ -78,6 +78,12 @@ def disconnect_all(timeout=5):
     if thread is not None and thread.is_alive():
         thread.join(timeout=timeout)
         if thread.is_alive():
+            # It didn't stop in time -- this can happen if TikTokLive is
+            # slow to close its socket. That thread's event handlers all
+            # check the generation counter before emitting anything (see
+            # is_current() in start_tiktok_client), so it can no longer
+            # affect the browser or the active session even though the
+            # OS thread/socket is still winding down in the background.
             print("Warning: thread still alive")
 
 def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None):
@@ -121,8 +127,21 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
         current_session['username'] = username
         current_session['thread'] = threading.current_thread()
 
+    def is_current():
+        # True only while this thread's connection is still the active
+        # one. If a previous connect/disconnect cycle left this thread
+        # running longer than expected (e.g. TikTokLive was slow to
+        # actually close the socket), this stops it from emitting stale
+        # messages into whatever stream is now connected, and avoids
+        # wasted work/socketio traffic from a connection nobody's using
+        # anymore.
+        with session_lock:
+            return current_session['generation'] == generation
+
     @client.on(ConnectEvent)
     async def on_connect(event: ConnectEvent):
+        if not is_current():
+            return
         print(f"Connected to @{event.unique_id} (Room ID: {client.room_id})")
         socketio.emit('status', {'connected': True, 'username': event.unique_id})
 
@@ -146,6 +165,8 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(CommentEvent)
     async def on_comment(event: CommentEvent):
+        if not is_current():
+            return
         message = {
             'type': 'chat',
             'nickname': getattr(event.user, 'nickname', 'User'),
@@ -156,6 +177,8 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(GiftEvent)
     async def on_gift(event: GiftEvent):
+        if not is_current():
+            return
         # Gifts can be streakable. We usually only want to alert when it's fully sent, but TikTokLive triggers on each streak or end of streak.
         message = {
             'type': 'gift',
@@ -168,6 +191,8 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(LikeEvent)
     async def on_like(event: LikeEvent):
+        if not is_current():
+            return
         # 'total' = total likes for the entire live, 'count' = likes in this batch
         total = getattr(event, 'total', None)
         count = getattr(event, 'count', 1)
@@ -182,6 +207,8 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(FollowEvent)
     async def on_follow(event: FollowEvent):
+        if not is_current():
+            return
         message = {
             'type': 'follow',
             'nickname': getattr(event.user, 'nickname', 'User'),
@@ -191,6 +218,8 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(JoinEvent)
     async def on_join(event: JoinEvent):
+        if not is_current():
+            return
         message = {
             'type': 'join',
             'nickname': getattr(event.user, 'nickname', 'User'),
@@ -200,10 +229,14 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
 
     @client.on(RoomUserSeqEvent)
     async def on_viewer_count(event: RoomUserSeqEvent):
+        if not is_current():
+            return
         socketio.emit('viewerCount', {'viewers': getattr(event, 'total', getattr(event, 'viewer_count', 0))})
 
     @client.on(DisconnectEvent)
     async def on_disconnect(event: DisconnectEvent):
+        if not is_current():
+            return
         print("Disconnected")
         socketio.emit('status', {'connected': False})
 
@@ -275,7 +308,6 @@ def handle_connect(data):
           and current_session['client'] is not None
           and getattr(current_session['client'],
             'connected', False))
-        active_client = current_session['client']
  
     if already_connected:
         socketio.emit('status', {'connected': True, 'username': username})
