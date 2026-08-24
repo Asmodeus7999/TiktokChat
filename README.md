@@ -31,7 +31,7 @@ That's it — it'll start at `http://127.0.0.1:5000`, reachable only from your o
 
 ## How to show it on your screen 
 
-1. Add a **Browser Source** to your scene or Docks (maybe need to change the css transparent background) in OBS. Or you can use     [Transparent Twitch Chat Overlay](https://github.com/s0urcetree/Transparent-Twitch-Chat-Overlay).
+1. Add a **Browser Source** to your scene or Docks (maybe need to change the css transparent background) in OBS. Or you can use     [Transparent Twitch Chat Overlay](https://github.com/baffler/Transparent-Twitch-Chat-Overlay).
 2. Point it at `http://localhost:5000`.
 3. Set the width/height to whatever fits your layout (400×800 works well as a starting point).
 4. Click into the source, type your `@username`, hit Connect. The setup screen fades out and you're left with just the chat feed.
