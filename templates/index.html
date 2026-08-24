@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Chat Overlay</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+
+<body>
+    <div id="setup-container">
+        <div class="setup-card">
+            <!-- Header -->
+            <div class="setup-header">
+                <div class="logo-icon">
+                    <svg class="tiktok-svg" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M448,209.91a210.06,210.06,0,0,1-122.77-39.25V349.38A162.55,162.55,0,1,1,185,188.31V278.2a74.62,74.62,0,1,0,52.23,71.18V0l88,0a121.18,121.18,0,0,0,1.86,22.17h0A122.18,122.18,0,0,0,381,102.39a121.43,121.43,0,0,0,67,20.14Z" />
+                    </svg>
+                </div>
+                <h1>TikTok Live Chat</h1>
+                <p class="setup-subtitle">Connect to a live stream to show chat overlay</p>
+            </div>
+
+            <!-- Username -->
+            <div class="field-group">
+                <label for="username-input" class="field-label">TikTok Username</label>
+                <div class="input-wrapper">
+                    <span class="input-prefix">@</span>
+                    <input type="text" id="username-input" placeholder="yourusername" autocomplete="off"
+                        spellcheck="false">
+                </div>
+            </div>
+
+            {% if enable_sessionid_login %}
+            <!-- Age Restricted Toggle -->
+            <button id="toggle-session-btn" class="age-toggle-btn" aria-expanded="false">
+                <span class="age-toggle-icon">🔞</span>
+                <span class="age-toggle-text">Age restricted stream</span>
+                <span class="age-toggle-arrow">›</span>
+            </button>
+            {% endif %}
+
+            {% if enable_sessionid_login %}
+            <!-- Age Restricted Section -->
+            <div id="session-id-section" class="age-section hidden">
+
+                <!-- Info Banner -->
+                <div class="info-banner">
+                    <span class="info-icon">ℹ</span>
+                    <div class="info-text">
+                        <strong>How to get your cookies</strong>
+                        <ol class="cookie-steps">
+                            <li>Open <strong>tiktok.com</strong> in Chrome/Edge and log in</li>
+                            <li>Press <kbd>F12</kbd> → <strong>Application</strong> tab</li>
+                            <li>Go to <strong>Cookies → https://www.tiktok.com</strong></li>
+                            <li>Copy the values of <code>sessionid</code> and <code>tt-target-idc</code></li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- Session ID -->
+                <div class="field-group">
+                    <label for="session-id-input" class="field-label">
+                        Session ID
+                        <span class="field-badge">Cookie</span>
+                    </label>
+                    <div class="input-wrapper password-wrapper">
+                        <input type="password" id="session-id-input" placeholder="Paste your sessionid value here"
+                            autocomplete="off">
+                        <button class="toggle-visibility-btn" id="toggle-session-vis" aria-label="Toggle visibility"
+                            title="Show/hide">👁</button>
+                    </div>
+                </div>
+
+                <!-- Target IDC -->
+                <div class="field-group">
+                    <label for="target-idc-select" class="field-label">
+                        Target IDC Region
+                        <span class="field-badge">Cookie</span>
+                    </label>
+                    <select id="target-idc-select">
+                        <option value="">— Select your region —</option>
+                        <optgroup label="Asia Pacific">
+                            <option value="maliva">maliva — Southeast Asia (MY/ID/TH)</option>
+                            <option value="sg">sg — Singapore</option>
+                            <option value="alisg">alisg — Singapore (Alibaba)</option>
+                            <option value="jp">jp — Japan</option>
+                            <option value="kr">kr — Korea</option>
+                        </optgroup>
+                        <optgroup label="Americas">
+                            <option value="useast5">useast5 — United States (East)</option>
+                            <option value="useast2">useast2 — United States (East 2)</option>
+                        </optgroup>
+                        <optgroup label="Europe">
+                            <option value="eu">eu — Europe</option>
+                        </optgroup>
+                        <optgroup label="Other">
+                            <option value="i18n">i18n — International</option>
+                            <option value="custom">✏ Custom value...</option>
+                        </optgroup>
+                    </select>
+                    <input type="text" id="target-idc-custom" class="hidden"
+                        placeholder="Type custom tt-target-idc value" autocomplete="off" spellcheck="false">
+                    <p class="field-hint">Match this exactly with your <code>tt-target-idc</code> cookie value</p>
+                </div>
+
+                <!-- Security Note -->
+                <div class="security-note">
+                    <span>🔒</span>
+                    <span>Your sessionid is sent to <strong>api.eulerstream.com</strong> to authenticate the WebSocket
+                        connection. It is never stored.</span>
+                </div>
+            </div>
+            {% endif %}
+
+
+            <!-- Connect Button -->
+            <button id="connect-btn">
+                <span id="connect-btn-text">Connect to Live</span>
+                <span id="connect-btn-spinner" class="hidden">⟳</span>
+            </button>
+            <p id="status-message"></p>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div id="chat-container" class="hidden">
+        <div id="stats-bar">
+            <div class="stat">
+                <span class="stat-icon">👥</span>
+                <span id="viewer-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">❤️</span>
+                <span id="like-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">💎</span>
+                <span id="gift-count">0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-icon">🚪</span>
+                <span id="join-count">0</span>
+            </div>
+        </div>
+        <div id="feeds-wrapper">
+            <div id="chat-messages"></div>
+            <div id="event-row">
+                <div id="like-feed" class="event-feed-col"></div>
+                <div id="join-feed" class="event-feed-col"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
