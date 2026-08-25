@@ -116,8 +116,10 @@ connectBtn.addEventListener('click', () => {
     chatMessages.innerHTML = '';
     const likeFeed = document.getElementById('like-feed');
     const joinFeed = document.getElementById('join-feed');
-    if (likeFeed) likeFeed.innerHTML = '';
-    if (joinFeed) joinFeed.innerHTML = '';
+    if (likeFeed) { likeFeed.innerHTML = ''; likeFeed.classList.add('collapsed'); }
+    if (joinFeed) { joinFeed.innerHTML = ''; joinFeed.classList.add('collapsed'); }
+    clearTimeout(eventFeedHideTimers['like-feed']);
+    clearTimeout(eventFeedHideTimers['join-feed']);
 
     socket.emit('connect_tiktok', { username, sessionid, targetIdc });
 });
@@ -186,7 +188,6 @@ function updateStats() {
     document.getElementById('viewer-count').textContent = formatNum(stats.viewers);
     document.getElementById('like-count').textContent = formatNum(stats.likes);
     document.getElementById('gift-count').textContent = formatNum(stats.gifts);
-    document.getElementById('join-count').textContent = formatNum(stats.joins);
 }
 
 // Seed initial stats from room info on connect
@@ -206,6 +207,23 @@ socket.on('chatMessage', (data) => {
 
 let userLikesBuffer = {};
 
+// Auto-fade the like/join feed columns independently, each after a few
+// seconds of no activity in that specific column.
+const EVENT_FEED_HIDE_DELAY = 4000; // ms
+const eventFeedHideTimers = {}; // keyed by element id: 'like-feed' | 'join-feed'
+
+function showEventFeed(feedId) {
+    const feedEl = document.getElementById(feedId);
+    if (!feedEl) return;
+
+    feedEl.classList.remove('collapsed');
+
+    clearTimeout(eventFeedHideTimers[feedId]);
+    eventFeedHideTimers[feedId] = setTimeout(() => {
+        feedEl.classList.add('collapsed');
+    }, EVENT_FEED_HIDE_DELAY);
+}
+
 // Add message to DOM
 function addMessage(data) {
 
@@ -214,7 +232,7 @@ function addMessage(data) {
     const userColor = stringToColor(data.nickname);
 
     // Check if it's an event for the new side feed
-    const isEventFeed = (data.type === 'like' || data.type === 'join' || data.type === 'follow');
+    const isEventFeed = (data.type === 'like' || data.type === 'join');
 
     if (data.type === 'like') {
         // Always use the stream's total likes if available (most accurate)
@@ -241,7 +259,8 @@ function addMessage(data) {
         updateStats();
         contentHtml = `<span class="comment" style="color: #a0a0b0; font-style: italic;">Joined the live 🚪</span>`;
     } else if (data.type === 'follow') {
-        contentHtml = `<span class="comment" style="color: #2be07a; font-style: italic;">Started following! ➕</span>`;
+        const followIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2be07a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="8" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>`;
+        contentHtml = `<span class="comment" style="color: #2be07a; font-style: italic;">${followIcon}Started following!</span>`;
     } else if (data.type === 'chat') {
         contentHtml = `<span class="comment">${escapeHtml(data.comment)}</span>`;
     } else if (data.type === 'gift') {
@@ -266,6 +285,7 @@ function addMessage(data) {
                 </div>
             `;
         }
+        showEventFeed(targetId);
         return; // Don't add to main chat
     }
 

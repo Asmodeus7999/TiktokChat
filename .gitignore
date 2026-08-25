@@ -1,0 +1,20 @@
+# Node / Electron
+node_modules/
+dist/
+build/
+release/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+build/
+*.spec
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store
+Thumbs.db

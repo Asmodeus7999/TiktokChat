@@ -1,0 +1,57 @@
+{
+  "name": "tiktokchat",
+  "version": "1.0.0",
+  "description": "A simple real-time chat overlay for TikTok Live, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public TikTok stream to show chat, gifts, likes, and viewer count — no TikTok account or login needed for normal use.",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dist": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.asmodeus.tiktokchat",
+    "productName": "TiktokChat",
+    "asar": false,
+    "electronLanguages": [
+      "en-US"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist/server.exe",
+        "to": "server.exe"
+      },
+      {
+        "from": "static",
+        "to": "static"
+      },
+      {
+        "from": "templates",
+        "to": "templates"
+      }
+    ],
+    "win": {
+      "icon": "icon.ico"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Asmodeus7999/TiktokChat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Asmodeus7999/TiktokChat/issues"
+  },
+  "homepage": "https://github.com/Asmodeus7999/TiktokChat#readme",
+  "devDependencies": {
+    "electron": "^43.4.1"
+  }
+}
