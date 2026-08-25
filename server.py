@@ -1,8 +1,9 @@
 import os
+import sys
 import ctypes
 import multiprocessing
 import threading
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import (
@@ -10,7 +11,23 @@ from TikTokLive.events import (
     GiftEvent, LikeEvent, FollowEvent, JoinEvent, RoomUserSeqEvent
 )
 from TikTokLive.client.errors import UserOfflineError, AgeRestrictedError
-app = Flask(__name__)
+
+# When frozen by PyInstaller (--onefile), sys.executable is the exe's real
+# path and the app's files get extracted to a temp folder at runtime.
+# templates/ and static/ are shipped alongside the exe (not baked into it),
+# so Flask needs to be pointed at that real location explicitly -- its
+# default relative lookup would otherwise search the temp extraction dir
+# and raise TemplateNotFound.
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static'),
+)
 
 # By default only accept Socket.IO connections whose Origin header matches
 # where this app itself is served from (localhost). This prevents an
@@ -385,4 +402,29 @@ if __name__ == '__main__':
         )
 
     print(f"Server running at http://{host}:{port}")
-    socketio.run(app, host=host, port=port)
+    # This app runs as a local, single-user overlay tool (bound to
+    # 127.0.0.1 by default) rather than a public production deployment,
+    # so Werkzeug's dev-server safety guard doesn't apply here -- newer
+    # flask-socketio versions hard-crash on startup without this flag.
+    socketio.run(app, host=host, port=port, allow_unsafe_werkzeug=True)
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    """Gracefully disconnects TikTok client and stops the server."""
+    print("Received shutdown request from Electron. Closing connections...")
+
+    # 1. Stop the TikTokLive client gracefully if it's running
+    try:
+        disconnect_all()
+        print("TikTok WebSocket connection closed cleanly.")
+    except Exception as e:
+        print(f"Error stopping client: {e}")
+            
+    # 2. Schedule process exit so Flask can send the response first
+    def stop_server():
+        import time
+        time.sleep(0.5)
+        os._exit(0)
+        
+    threading.Thread(target=stop_server).start()
+    return jsonify({"status": "shutting down"}), 200
