@@ -1,6 +1,6 @@
 {
   "name": "tiktokchat",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple real-time chat overlay for TikTok Live, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public TikTok stream to show chat, gifts, likes, and viewer count — no TikTok account or login needed for normal use.",
   "main": "main.js",
   "scripts": {

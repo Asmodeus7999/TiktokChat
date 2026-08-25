@@ -349,7 +349,11 @@ def handle_disconnect():
     disconnect_all()
 
 def optimize_process_impact():
-    """Lowers priority and disables Core 0 natively using Windows API."""
+    """Lowers this process's scheduling priority to BelowNormal using the
+    Windows API. CPU affinity is intentionally NOT set here -- main.js
+    sets affinity for this process (and the Electron process) right after
+    spawning it, so this only owns priority to avoid the two fighting
+    over the same setting."""
     if os.name != 'nt':
         print("Notice: OS is not Windows. Skipping hardware optimizations.")
         return
@@ -363,18 +367,11 @@ def optimize_process_impact():
         kernel32.SetPriorityClass(process_handle, BELOW_NORMAL_PRIORITY_CLASS)
         print("Process priority set to BELOW_NORMAL to reduce game stutters.")
         
-        # 2. Prevent using Core 0 by applying a CPU bitmask
-        core_count = multiprocessing.cpu_count()
-        if core_count > 1:
-            # Create a bitmask for all available cores (e.g., 4 cores = 1111 in binary)
-            affinity_mask = (1 << core_count) - 1
-            # Remove Core 0 (Bit 0) from the mask (e.g., 1111 becomes 1110)
-            affinity_mask &= ~1 
-            
-            # Apply the new affinity mask
-            kernel32.SetProcessAffinityMask(process_handle, affinity_mask)
-            print("Process affinity applied: Core 0 is now disabled for this server.")
-            
+        # 2. CPU affinity is intentionally NOT set here anymore.
+        # main.js now sets affinity for this process (and the Electron
+        # process) right after spawning it, so setting it here too would
+        # just race with that and get overwritten anyway.
+        
     except Exception as e:
         print(f"Notice: Could not apply hardware optimizations: {e}")
 
