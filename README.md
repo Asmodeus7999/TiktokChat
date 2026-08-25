@@ -48,7 +48,7 @@ ENABLE_SESSIONID_LOGIN=true python server.py
 ```
 That brings back an "Age restricted stream" option on the setup screen where you can paste in your `sessionid` and `tt-target-idc` cookies from tiktok.com. Worth knowing before you do: pasting those in means your TikTok session gets sent to a third-party service (`api.eulerstream.com`) so it can authenticate the connection for you. The app itself never saves it anywhere, but it's still your real account cookie leaving your machine, so only turn this on when you actually need it, and only if you're OK trusting that service.
 
-## Building the desktop app (optional)
+## Building the desktop app
 
 If you'd rather run this as a standalone Windows app (a floating overlay window) instead of a browser tab, there's an Electron wrapper included. This packages everything — including a bundled Python backend — into a folder that runs with no Python or dependencies required on the machine that runs it.
 
@@ -79,4 +79,14 @@ This copies `dist\server.exe` plus `static/` and `templates/` into `release\win-
 release\win-unpacked\TiktokChat.exe
 ```
 
-To hand this off to someone else, zip up the entire `release\win-unpacked\` folder — they extract it and run `TiktokChat.exe` directly. Note that `release/` and `dist/` are both gitignored, so this folder isn't tracked in the repo; you (or whoever's building it) need to run the steps above locally each time to produce it.
+### Controls
+ 
+The overlay starts **unlocked** — you'll see a red drag bar and dashed border, and can click through it normally to move or resize it into position.
+ 
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Alt+F9` | Toggle lock. Locked = click-through (mouse passes through to whatever's behind it, e.g. your game or stream), drag bar/border hidden. Unlocked = draggable/resizable again. |
+| `Ctrl+Alt+F7` | While locked, toggle click-through on/off without fully unlocking — lets you briefly interact with the overlay (e.g. scroll chat) then pass mouse input through again. |
+| Right-click | Opens a small menu with **Refresh** (reload the page, useful if the connection drops) and **Toggle DevTools** (for troubleshooting). |
+ 
+One thing to know: right-click only works while the overlay is **unlocked**, or briefly interactive via `Ctrl+Alt+F7`. When it's locked and click-through, all mouse input — including right-clicks — passes straight through to whatever's underneath, so the menu won't appear until you unlock it.
