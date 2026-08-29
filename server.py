@@ -5,6 +5,7 @@ import multiprocessing
 import threading
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO
+import pytchat
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import (
     ConnectEvent, CommentEvent, DisconnectEvent, 
@@ -80,15 +81,18 @@ def disconnect_all(timeout=5):
  
     if client is not None:
         try:
-            loop = getattr(client, 'loop',
-              getattr(client, '_asyncio_loop', None))
-            if loop and loop.is_running():
-                future = asyncio.run_coroutine_threadsafe(
-                  client.disconnect(), loop)
-                try:
-                    future.result(timeout=timeout)
-                except Exception as e:
-                    print(f"Timed out: {e}")
+            if hasattr(client, 'terminate'):
+                client.terminate()
+            else:
+                loop = getattr(client, 'loop',
+                  getattr(client, '_asyncio_loop', None))
+                if loop and loop.is_running():
+                    future = asyncio.run_coroutine_threadsafe(
+                      client.disconnect(), loop)
+                    try:
+                        future.result(timeout=timeout)
+                    except Exception as e:
+                        print(f"Timed out: {e}")
         except Exception as e:
             print(f"Error disconnecting: {e}")
  
@@ -296,50 +300,143 @@ def start_tiktok_client(username, generation, sessionid=None, tt_target_idc=None
                 current_session['username'] = None
                 current_session['thread'] = None
 
+def start_youtube_client(video_id, generation):
+    try:
+        import re
+        # Extract video ID from URL if user passed a URL
+        if "youtube.com" in video_id or "youtu.be" in video_id:
+            match = re.search(r'(?:v=|youtu\.be/|/v/|/embed/|/shorts/)([^&?]+)', video_id)
+            if match:
+                video_id = match.group(1)
+        
+        chat = pytchat.create(video_id=video_id, interruptable=False)
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"Error: {error_msg}")
+        socketio.emit('status', {'connected': False, 'error': error_msg})
+        return
+        
+    with session_lock:
+        if current_session['generation'] != generation:
+            chat.terminate()
+            return
+        current_session['client'] = chat
+        current_session['username'] = video_id
+        current_session['thread'] = threading.current_thread()
+        
+    def is_current():
+        with session_lock:
+            return current_session['generation'] == generation
+
+    print(f"Connected to YouTube Live (Video ID: {video_id})")
+    socketio.emit('status', {'connected': True, 'username': video_id})
+    
+    try:
+        while chat.is_alive() and is_current():
+            for c in chat.get().sync_items():
+                if not is_current():
+                    break
+                
+                # Check for Super Chat
+                if c.amountValue > 0:
+                    message = {
+                        'type': 'gift',
+                        'nickname': c.author.name,
+                        'giftName': f"SuperChat {c.amountString}",
+                        'repeatCount': 1,
+                        'profilePictureUrl': c.author.imageUrl
+                    }
+                else:
+                    message = {
+                        'type': 'chat',
+                        'nickname': c.author.name,
+                        'comment': c.message,
+                        'profilePictureUrl': c.author.imageUrl
+                    }
+                socketio.emit('chatMessage', message)
+                
+            import time
+            time.sleep(1) # sleep briefly to prevent tight loop
+            
+        if is_current():
+            print("YouTube Live disconnected.")
+            socketio.emit('status', {'connected': False})
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"Error: {error_msg}")
+        if is_current():
+            socketio.emit('status', {'connected': False, 'error': error_msg})
+    finally:
+        chat.terminate()
+        with session_lock:
+            if current_session.get('client') is chat:
+                current_session['client'] = None
+                current_session['username'] = None
+                current_session['thread'] = None
+
 @app.route('/')
 def index():
     return render_template('index.html', enable_sessionid_login=ENABLE_SESSIONID_LOGIN)
 
-@socketio.on('connect_tiktok')
-def handle_connect(data):
-    username = data.get('username')
-
-    # Ignore any sessionid/targetIdc the client sends unless the feature
-    # is explicitly turned on server-side. This isn't just a UI hint --
-    # it means this app can't be made to accept/forward a TikTok cookie
-    # at all while the flag is off, even by someone bypassing the UI.
-    if ENABLE_SESSIONID_LOGIN:
-        sessionid = data.get('sessionid', '').strip() or None
-        tt_target_idc = data.get('targetIdc', '').strip() or None
-    else:
-        sessionid = None
-        tt_target_idc = None
-
-    if not username:
+@socketio.on('connect_stream')
+def handle_connect_stream(data):
+    platform = data.get('platform', 'tiktok')
+    identifier = data.get('username') or data.get('videoId')
+    
+    if platform == 'tiktok':
+        if ENABLE_SESSIONID_LOGIN:
+            sessionid = data.get('sessionid', '').strip() or None
+            tt_target_idc = data.get('targetIdc', '').strip() or None
+        else:
+            sessionid = None
+            tt_target_idc = None
+            
+    if not identifier:
         return
-    username = username.lstrip('@')
- 
+        
+    if platform == 'tiktok':
+        identifier = identifier.lstrip('@')
+        
     with session_lock:
+        client = current_session['client']
+        is_connected = False
+        if client is not None:
+            if hasattr(client, 'is_alive'):
+                is_connected = client.is_alive()
+            else:
+                is_connected = getattr(client, 'connected', False)
+                
         already_connected = (
-          current_session['username'] == username
-          and current_session['client'] is not None
-          and getattr(current_session['client'],
-            'connected', False))
- 
+          current_session['username'] == identifier
+          and is_connected
+        )
+          
     if already_connected:
-        socketio.emit('status', {'connected': True, 'username': username})
+        socketio.emit('status', {'connected': True, 'username': identifier})
         return
- 
+        
     disconnect_all()
- 
+    
     with session_lock:
         generation = current_session['generation']
- 
-    print(f"Connecting to {username}...")
- 
-    client_thread = threading.Thread(
-      target=start_tiktok_client,
-      args=(username, generation, sessionid, tt_target_idc))
+        
+    print(f"Connecting to {platform} ({identifier})...")
+    
+    if platform == 'tiktok':
+        client_thread = threading.Thread(
+          target=start_tiktok_client,
+          args=(identifier, generation, sessionid, tt_target_idc))
+    else:
+        client_thread = threading.Thread(
+          target=start_youtube_client,
+          args=(identifier, generation))
+          
     client_thread.daemon = True
     client_thread.start()
 

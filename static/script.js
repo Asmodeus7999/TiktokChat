@@ -39,6 +39,33 @@ const sessionIdInput = document.getElementById('session-id-input');
 const targetIdcSelect = document.getElementById('target-idc-select');
 const targetIdcCustom = document.getElementById('target-idc-custom');
 const toggleSessionVis = document.getElementById('toggle-session-vis');
+const platformRadios = document.getElementsByName('platform');
+const identifierLabel = document.getElementById('identifier-label');
+const identifierPrefix = document.getElementById('identifier-prefix');
+
+// Platform switch logic
+if (platformRadios) {
+    platformRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const platform = e.target.value;
+            if (platform === 'youtube') {
+                identifierLabel.textContent = 'YouTube Video URL or ID';
+                identifierPrefix.style.display = 'none';
+                usernameInput.placeholder = 'https://youtube.com/watch?v=...';
+                usernameInput.style.paddingLeft = '16px';
+                if (toggleSessionBtn) toggleSessionBtn.classList.add('hidden');
+                if (sessionIdSection) sessionIdSection.classList.add('hidden');
+            } else {
+                identifierLabel.textContent = 'TikTok Username';
+                identifierPrefix.style.display = 'flex';
+                usernameInput.placeholder = 'yourusername';
+                usernameInput.style.paddingLeft = '36px';
+                if (toggleSessionBtn) toggleSessionBtn.classList.remove('hidden');
+                // Don't auto-show sessionIdSection, let user toggle it
+            }
+        });
+    });
+}
 
 // Toggle age-restricted section (elements only exist when the
 // sessionid login feature is enabled server-side; guard against
@@ -100,6 +127,14 @@ connectBtn.addEventListener('click', () => {
     const username = usernameInput.value.trim();
     if (!username) return;
 
+    // Get selected platform
+    let platform = 'tiktok';
+    if (platformRadios) {
+        platformRadios.forEach(radio => {
+            if (radio.checked) platform = radio.value;
+        });
+    }
+
     const sessionid = sessionIdInput ? sessionIdInput.value.trim() : '';
     const targetIdc = getTargetIdc();
 
@@ -108,6 +143,17 @@ connectBtn.addEventListener('click', () => {
     connectBtn.disabled = true;
     connectBtnText.textContent = 'Connecting...';
     connectBtnSpinner.classList.remove('hidden');
+
+    const statsBar = document.getElementById('stats-bar');
+    const eventRow = document.getElementById('event-row');
+
+    if (platform === 'youtube') {
+        if (statsBar) statsBar.classList.add('hidden');
+        if (eventRow) eventRow.classList.add('hidden');
+    } else {
+        if (statsBar) statsBar.classList.remove('hidden');
+        if (eventRow) eventRow.classList.remove('hidden');
+    }
 
     // Reset stats, buffers, and DOM for the new connection
     stats = { viewers: 0, likes: 0, gifts: 0, joins: 0 };
@@ -121,7 +167,7 @@ connectBtn.addEventListener('click', () => {
     clearTimeout(eventFeedHideTimers['like-feed']);
     clearTimeout(eventFeedHideTimers['join-feed']);
 
-    socket.emit('connect_tiktok', { username, sessionid, targetIdc });
+    socket.emit('connect_stream', { platform, username, sessionid, targetIdc });
 });
 
 // Allow Enter key to connect

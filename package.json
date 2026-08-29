@@ -1,15 +1,15 @@
 {
-  "name": "tiktokchat",
+  "name": "streamchat",
   "version": "1.0.1",
-  "description": "A simple real-time chat overlay for TikTok Live, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public TikTok stream to show chat, gifts, likes, and viewer count — no TikTok account or login needed for normal use.",
+  "description": "A simple real-time chat overlay for Tiktok, Youtube Streams, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public stream to show chat, gifts, likes, and viewer count.",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dist": "electron-builder --dir"
   },
   "build": {
-    "appId": "com.asmodeus.tiktokchat",
-    "productName": "TiktokChat",
+    "appId": "com.asmodeus.streamchat",
+    "productName": "StreamChat",
     "asar": false,
     "electronLanguages": [
       "en-US"
@@ -41,16 +41,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Asmodeus7999/TiktokChat.git"
+    "url": "git+https://github.com/Asmodeus7999/StreamChatOverlay.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Asmodeus7999/TiktokChat/issues"
+    "url": "https://github.com/Asmodeus7999/StreamChatOverlay/issues"
   },
-  "homepage": "https://github.com/Asmodeus7999/TiktokChat#readme",
+  "homepage": "https://github.com/Asmodeus7999/StreamChatOverlay#readme",
   "devDependencies": {
     "electron": "^43.4.1"
   }
