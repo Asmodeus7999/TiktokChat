@@ -112,12 +112,12 @@ function logVerbose(msg) {
 // Restricts a process to specific CPU cores. mask is a bitmask:
 // core 0 = 1, core 1 = 2, core 2 = 4, core 3 = 8, etc.
 // Cores 0 and 2 => 1 + 4 = 5
-const CPU_AFFINITY_MASK = 5;
+const CPU_AFFINITY_MASK = 10;
 
 function setProcessAffinity(pid, mask) {
     try {
         execSync(`powershell -NoProfile -Command "(Get-Process -Id ${pid}).ProcessorAffinity = [IntPtr]${mask}"`);
-        logVerbose(`Set CPU affinity for PID ${pid} to mask ${mask} (cores 0 and 2)`);
+        logVerbose(`Set CPU affinity for PID ${pid} to mask ${mask} (cores 1 and 3)`);
     } catch (err) {
         logError(`Failed to set CPU affinity for PID ${pid}: ${err.message}`);
     }
@@ -343,6 +343,9 @@ function toggleInteraction() {
         win.setIgnoreMouseEvents(false);
     }
 }
+
+// Limit overlay to 30 FPS to save resources for the game
+app.commandLine.appendSwitch('limit-fps', '30');
 
 app.whenReady().then(() => {
     if (!gotSingleInstanceLock) return; // second instance -- already quitting

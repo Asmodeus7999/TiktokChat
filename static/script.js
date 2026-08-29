@@ -1,6 +1,6 @@
 const socket = io();
 
-const MAX_MESSAGES = 200; // Max chat messages kept in DOM to limit memory usage
+const MAX_MESSAGES = 50; // Max chat messages kept in DOM to limit memory usage
 
 // --- Gift Sound (Web Audio API, no files needed) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();

@@ -515,7 +515,7 @@ kbd {
     padding: 8px 12px;
     background: rgba(20, 20, 25, 0.85);
     border-radius: 12px;
-    backdrop-filter: blur(10px);
+    /* backdrop-filter: blur(10px); */
     border: 1px solid rgba(255, 255, 255, 0.05);
     margin-bottom: 10px;
     font-weight: 600;
@@ -586,9 +586,9 @@ kbd {
     padding: 8px 10px;
     background: var(--msg-bg);
     border-radius: 8px;
-    backdrop-filter: blur(10px);
+    /* backdrop-filter: blur(10px); */
     border: 1px solid rgba(255, 255, 255, 0.05);
-    animation: slideIn 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+    /* animation: slideIn 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; */
 }
 
 .event-box.like {
@@ -617,11 +617,11 @@ kbd {
     padding: 10px 14px;
     background: var(--msg-bg);
     border-radius: 12px;
-    backdrop-filter: blur(10px);
+    /* backdrop-filter: blur(10px); */
     border: 1px solid rgba(255, 255, 255, 0.05);
-    animation: slideIn 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
-    opacity: 0;
-    transform: translateY(20px);
+    /* animation: slideIn 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; */
+    /* opacity: 0; */
+    /* transform: translateY(20px); */
 }
 
 .message.gift {
