@@ -101,6 +101,7 @@ body {
     line-height: 1.1;
     background: linear-gradient(90deg, #ffffff, #c0c0d0);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     margin-bottom: 0.2rem;
 }
