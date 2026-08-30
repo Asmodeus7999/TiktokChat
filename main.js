@@ -111,8 +111,8 @@ function logVerbose(msg) {
 
 // Restricts a process to specific CPU cores. mask is a bitmask:
 // core 0 = 1, core 1 = 2, core 2 = 4, core 3 = 8, etc.
-// Cores 0 and 2 => 1 + 4 = 5
-const CPU_AFFINITY_MASK = 10;
+// Cores 0, 1, 2 and 3 => 1 + 2 + 4 + 8 = 15
+const CPU_AFFINITY_MASK = 15;
 
 function setProcessAffinity(pid, mask) {
     try {
