@@ -11,7 +11,7 @@ let backendProcess = null;
 
 // Prevents launching a second copy of the app. Without this, a double
 // double-click (or a stray leftover instance from a crash) would spawn a
-// second server.exe trying to bind the same port 5000 -- the second one
+// second node server trying to bind the same port 5000 -- the second one
 // fails, and you're left with two overlay windows or a broken one with no
 // clear reason why.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
@@ -116,10 +116,10 @@ const CPU_AFFINITY_MASK = 15;
 
 function setProcessAffinity(pid, mask) {
     try {
-        execSync(`powershell -NoProfile -Command "(Get-Process -Id ${pid}).ProcessorAffinity = [IntPtr]${mask}"`);
-        logVerbose(`Set CPU affinity for PID ${pid} to mask ${mask} (cores 1 and 3)`);
+        execSync(`powershell -NoProfile -Command "(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).ProcessorAffinity = [IntPtr]${mask}"`);
+        logVerbose(`Set CPU affinity for PID ${pid} to mask ${mask}`);
     } catch (err) {
-        logError(`Failed to set CPU affinity for PID ${pid}: ${err.message}`);
+        logVerbose(`Failed to set CPU affinity for PID ${pid} (expected for short-lived child processes)`);
     }
 }
 
@@ -129,8 +129,7 @@ function setProcessAffinity(pid, mask) {
 // alone only covers the main/browser process. This walks the whole
 // descendant tree of a given root PID and applies affinity to every
 // process found. (Priority is intentionally NOT touched here -- Electron
-// runs at whatever priority Windows assigns by default, and server.exe
-// manages its own priority independently in server.py.)
+// runs at whatever priority Windows assigns by default).
 function getChildPids(pid) {
     try {
         const out = execSync(
@@ -163,65 +162,17 @@ process.on('uncaughtException', (err) => {
 });
 
 function getBackendDir() {
-    return app.isPackaged
-        ? process.resourcesPath
-        : __dirname;
+    return __dirname;
 }
 
-function launchPythonBackend() {
-    logVerbose("Starting backend server...");
+function launchNodeBackend() {
+    logVerbose("Starting backend server natively...");
     const backendDir = getBackendDir();
-    const exePath = path.join(backendDir, 'server.exe');
-    logVerbose(`Packaged: ${app.isPackaged}, exePath: ${exePath}`);
-
-    if (!fs.existsSync(exePath)) {
-        logError(`Backend exe not found at: ${exePath}`);
-        dialog.showErrorBox(
-            "Backend Not Found",
-            `Could not find server.exe at:\n${exePath}\n\nMake sure server.exe is placed next to main.js (in dev) or was bundled correctly (in the packaged app).`
-        );
-        return;
-    }
-    logVerbose("server.exe found on disk, spawning...");
-
     try {
-        backendProcess = spawn(exePath, [], {
-            cwd: backendDir,
-            windowsHide: true, // no visible console window
-        });
-        logVerbose(`spawn() called, pid: ${backendProcess.pid}`);
-        // Affinity applied immediately -- hard constraint we always want
-        // active. Priority is left untouched here; server.py manages its
-        // own priority (BelowNormal) independently at its own startup.
-        applyAffinityToTree(backendProcess.pid);
+        const { startServer } = require(path.join(backendDir, 'dist-ts', 'server.js'));
+        startServer(backendDir);
     } catch (err) {
-        logError(`EXCEPTION during spawn(): ${err.message}`);
-        return;
-    }
-
-    backendProcess.stdout.on('data', (data) => logVerbose(`[backend stdout] ${data}`));
-    backendProcess.stderr.on('data', (data) => logError(`[backend stderr] ${data}`));
-    backendProcess.on('error', (err) => logError(`SPAWN ERROR EVENT: ${err.message}`));
-    backendProcess.on('exit', (code, signal) => {
-        if (code !== 0) {
-            logError(`Backend process exited abnormally. code=${code} signal=${signal}`);
-        } else {
-            logVerbose(`Backend process exited. code=${code} signal=${signal}`);
-        }
-        backendProcess = null;
-    });
-}
-
-function killPythonBackend() {
-    console.log("Stopping backend process...");
-    if (backendProcess && backendProcess.pid) {
-        try {
-            // /T kills the process tree in case server.exe spawned children
-            execSync(`taskkill /PID ${backendProcess.pid} /F /T`);
-        } catch (e) {
-            // Ignore if already closed
-        }
-        backendProcess = null;
+        logError(`Failed to start native node server: ${err.message}`);
     }
 }
 
@@ -307,9 +258,7 @@ function createWindow() {
 
         // Page has finished loading. Affinity is already active (set at
         // spawn time). Priority is intentionally left at whatever Windows
-        // assigns by default for the Electron process -- no explicit
-        // priority call here anymore. server.py still manages its own
-        // priority independently (BelowNormal, set at its own startup).
+        // assigns by default for the Electron process.
     });
 }
 
@@ -356,7 +305,7 @@ app.whenReady().then(() => {
     // default.
     applyAffinityToTree(process.pid);
 
-    launchPythonBackend();
+    launchNodeBackend();
 
     setTimeout(() => {
         createWindow();
@@ -375,26 +324,6 @@ app.on('window-all-closed', () => {
 });
 
 // 🚨 GRACEFUL SHUTDOWN HANDLER
-app.on('will-quit', async (e) => {
-    if (!isQuitting) {
-        // Pause exit to complete asynchronous cleanup
-        e.preventDefault();
-        isQuitting = true;
-        globalShortcut.unregisterAll();
-
-        console.log("Sending Ctrl+C equivalent shutdown signal to Python...");
-        try {
-            // Trigger the graceful shutdown endpoint in Flask
-            await fetch('http://localhost:5000/shutdown', { method: 'POST' });
-            console.log("Python acknowledged shutdown.");
-        } catch (err) {
-            console.log("Python server already stopped or unreachable.");
-        }
-
-        // Wait 500ms for TikTokLive WebSocket close handshake to finish
-        setTimeout(() => {
-            killPythonBackend();
-            app.quit();
-        }, 500);
-    }
+app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
 });

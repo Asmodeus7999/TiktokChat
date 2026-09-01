@@ -1,16 +1,10 @@
-# Node / Electron
+# TypeScript / Node / Electron
 node_modules/
 dist/
+dist-ts/
 build/
 release/
 
-# Python
-__pycache__/
-*.pyc
-venv/
-.venv/
-build/
-*.spec
 
 # Env / secrets
 .env

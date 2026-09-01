@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TikTok Live Chat Overlay</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="/static/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
 </head>
@@ -52,20 +52,15 @@
                 </div>
             </div>
 
-            {% if enable_sessionid_login %}
-            <!-- Age Restricted Toggle -->
+            <!-- AGE RESTRICTED LOGIN (Uncomment to enable)
             <button id="toggle-session-btn" class="age-toggle-btn" aria-expanded="false">
                 <span class="age-toggle-icon">🔞</span>
                 <span class="age-toggle-text">Age restricted stream</span>
                 <span class="age-toggle-arrow">›</span>
             </button>
-            {% endif %}
 
-            {% if enable_sessionid_login %}
-            <!-- Age Restricted Section -->
             <div id="session-id-section" class="age-section hidden">
 
-                <!-- Info Banner -->
                 <div class="info-banner">
                     <span class="info-icon">ℹ</span>
                     <div class="info-text">
@@ -79,7 +74,6 @@
                     </div>
                 </div>
 
-                <!-- Session ID -->
                 <div class="field-group">
                     <label for="session-id-input" class="field-label">
                         Session ID
@@ -93,7 +87,6 @@
                     </div>
                 </div>
 
-                <!-- Target IDC -->
                 <div class="field-group">
                     <label for="target-idc-select" class="field-label">
                         Target IDC Region
@@ -125,15 +118,13 @@
                     <p class="field-hint">Match this exactly with your <code>tt-target-idc</code> cookie value</p>
                 </div>
 
-                <!-- Security Note -->
                 <div class="security-note">
                     <span>🔒</span>
                     <span>Your sessionid is sent to <strong>api.eulerstream.com</strong> to authenticate the WebSocket
                         connection. It is never stored.</span>
                 </div>
             </div>
-            {% endif %}
-
+            -->
 
             <!-- Connect Button -->
             <button id="connect-btn">
@@ -169,7 +160,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="/static/script.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,12 @@
+diff --git a/node_modules/youtube-chat/dist/parser.js b/node_modules/youtube-chat/dist/parser.js
+index 2245f50..60942b6 100644
+--- a/node_modules/youtube-chat/dist/parser.js
++++ b/node_modules/youtube-chat/dist/parser.js
+@@ -86,6 +86,7 @@ function convertColorToHex6(colorNum) {
+ }
+ /** メッセージrun配列をMessageItem配列へ変換 */
+ function parseMessages(runs) {
++    if (!runs) return [];
+     return runs.map((run) => {
+         if ("text" in run) {
+             return run;

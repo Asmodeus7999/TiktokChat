@@ -252,6 +252,7 @@ socket.on('chatMessage', (data) => {
 });
 
 let userLikesBuffer = {};
+const MAX_LIKE_BUFFER_FRONTEND = 3000;
 
 // Auto-fade the like/join feed columns independently, each after a few
 // seconds of no activity in that specific column.
@@ -289,17 +290,26 @@ function addMessage(data) {
         }
         updateStats();
 
-        // Buffer likes per user
-        userLikesBuffer[data.nickname] = (userLikesBuffer[data.nickname] || 0) + (data.likeCount || 1);
+        // Track cumulative likes per user and show at milestones: 1, 10, 25, 50
+        const LIKE_MILESTONES = [1, 10, 25, 50];
+        const prev = userLikesBuffer[data.nickname] || 0;
+        const next = prev + (data.likeCount || 1);
 
-        // Only show in feed every 15 likes
-        if (userLikesBuffer[data.nickname] >= 15) {
-            const displayLikes = Math.floor(userLikesBuffer[data.nickname] / 15) * 15;
-            userLikesBuffer[data.nickname] %= 15; // keep the remainder
-            contentHtml = `<span class="comment" style="color: #ff3c64; font-style: italic;">Sent ${displayLikes} likes! ❤️</span>`;
-        } else {
-            return; // Stats updated, but don't show notification yet
+        // Purge buffer if it gets too large (popular stream with many unique viewers)
+        if (Object.keys(userLikesBuffer).length >= MAX_LIKE_BUFFER_FRONTEND) {
+            userLikesBuffer = {};
         }
+        userLikesBuffer[data.nickname] = next;
+
+        // Find if we crossed any milestone between prev and next
+        const crossed = LIKE_MILESTONES.filter(m => prev < m && next >= m);
+        if (crossed.length === 0) {
+            return; // No milestone crossed yet
+        }
+        // Show the highest milestone crossed
+        const milestone = crossed[crossed.length - 1];
+        const likeText = milestone === 1 ? 'a like' : `${milestone} likes`;
+        contentHtml = `<span class="comment" style="color: #ff3c64; font-style: italic;">Sent ${likeText}! ❤️</span>`;
     } else if (data.type === 'join') {
         stats.joins += 1;
         updateStats();
@@ -313,7 +323,12 @@ function addMessage(data) {
         stats.gifts += parseInt(data.repeatCount) || 1;
         updateStats();
         playGiftSound();
-        contentHtml = `<span class="comment" style="color: #ff0050; font-weight: bold;">Sent ${data.repeatCount}x ${escapeHtml(data.giftName)}! 🎁</span>`;
+        const giftIconHtml = (data.giftIconUrl && isSafeImageUrl(data.giftIconUrl))
+            ? `<img src="${data.giftIconUrl}" class="gift-icon" onerror="this.style.display='none'">`
+            : '<span class="gift-icon-emoji">🎁</span>';
+        contentHtml = `<span class="comment" style="color: #ff0050; font-weight: bold;">Sent ${data.repeatCount}x ${escapeHtml(data.giftName)}!</span>`;
+        // Store for appending after element is built
+        data._giftIconHtml = giftIconHtml;
     }
 
 
@@ -364,6 +379,14 @@ function addMessage(data) {
 
     msgDiv.appendChild(avatarImg);
     msgDiv.appendChild(contentDiv);
+
+    // Append gift icon to the right side for gift messages
+    if (data._giftIconHtml) {
+        const iconWrapper = document.createElement('div');
+        iconWrapper.className = 'gift-icon-wrapper';
+        iconWrapper.innerHTML = data._giftIconHtml;
+        msgDiv.appendChild(iconWrapper);
+    }
 
     chatMessages.prepend(msgDiv);
 
