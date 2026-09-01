@@ -7,7 +7,7 @@
 
 :root {
     --bg-color: transparent;
-    --msg-bg: rgba(30, 30, 38, 0.75);
+    --msg-bg: rgba(30, 30, 38, 0.4);
     --text-primary: #ffffff;
     --text-secondary: #a0a0b0;
     --accent: #ff0050;
@@ -550,7 +550,7 @@ kbd {
     display: flex;
     justify-content: space-around;
     padding: 8px 12px;
-    background: rgba(20, 20, 25, 0.85);
+    background: rgba(20, 20, 25, 0.65);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     margin-bottom: 10px;
@@ -626,13 +626,13 @@ kbd {
 }
 
 .event-box.like {
-    background: rgba(50, 15, 25, 0.95);
+    background: rgba(50, 15, 25, 0.65);
     border: 1px solid rgba(255, 60, 100, 0.4);
 }
 
 .event-box.join,
 .event-box.follow {
-    background: rgba(15, 45, 25, 0.95);
+    background: rgba(15, 45, 25, 0.65);
     border: 1px solid rgba(43, 224, 122, 0.4);
 }
 
@@ -684,7 +684,8 @@ kbd {
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
-    border: 2px solid rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 .message-content {
@@ -697,12 +698,37 @@ kbd {
     font-weight: 700;
     font-size: 0.9rem;
     color: #00f2fe;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .comment {
     font-size: 0.95rem;
     line-height: 1.4;
     word-break: break-word;
+    color: #ffffff;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.gift-icon-wrapper {
+    margin-left: auto;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 8px;
+}
+
+.gift-icon {
+    width: 52px;
+    height: 52px;
+    object-fit: contain;
+    border-radius: 8px;
+    filter: drop-shadow(0 2px 6px rgba(255, 0, 80, 0.5));
+}
+
+.gift-icon-emoji {
+    font-size: 2.4rem;
+    line-height: 1;
 }
 
 .hidden {

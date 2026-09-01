@@ -1,11 +1,15 @@
 {
   "name": "streamchat",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A simple real-time chat overlay for Tiktok, Youtube Streams, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public stream to show chat, gifts, likes, and viewer count.",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dist": "electron-builder --dir"
+    "start": "electron .",
+    "dev": "electron .",
+    "build:ts": "tsc",
+    "dist": "npm run build:ts && electron-builder --dir",
+    "postinstall": "patch-package"
   },
   "build": {
     "appId": "com.asmodeus.streamchat",
@@ -19,21 +23,10 @@
     },
     "files": [
       "main.js",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "dist/server.exe",
-        "to": "server.exe"
-      },
-      {
-        "from": "static",
-        "to": "static"
-      },
-      {
-        "from": "templates",
-        "to": "templates"
-      }
+      "package.json",
+      "dist-ts/**/*",
+      "static/**/*",
+      "templates/**/*"
     ],
     "win": {
       "icon": "icon.ico"
@@ -52,6 +45,18 @@
   },
   "homepage": "https://github.com/Asmodeus7999/StreamChatOverlay#readme",
   "devDependencies": {
-    "electron": "^43.4.1"
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.4.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "patch-package": "^8.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "tiktok-live-connector": "^2.4.4",
+    "youtube-chat": "^2.2.0"
   }
 }
