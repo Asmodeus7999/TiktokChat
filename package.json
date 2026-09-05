@@ -1,9 +1,11 @@
 {
   "name": "streamchat",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A simple real-time chat overlay for Tiktok, Youtube Streams, made for OBS. It's built with Python (Flask) and WebSockets, and just connects to a public stream to show chat, gifts, likes, and viewer count.",
   "main": "main.js",
   "scripts": {
+    "clean": "npx rimraf release dist-ts",
+    "prebuild:ts": "npm run clean",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
     "dev": "electron .",

@@ -109,53 +109,7 @@ function logVerbose(msg) {
     if (VERBOSE) logError(msg);
 }
 
-// Restricts a process to specific CPU cores. mask is a bitmask:
-// core 0 = 1, core 1 = 2, core 2 = 4, core 3 = 8, etc.
-// Cores 0, 1, 2 and 3 => 1 + 2 + 4 + 8 = 15
-const CPU_AFFINITY_MASK = 15;
 
-function setProcessAffinity(pid, mask) {
-    try {
-        execSync(`powershell -NoProfile -Command "(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).ProcessorAffinity = [IntPtr]${mask}"`);
-        logVerbose(`Set CPU affinity for PID ${pid} to mask ${mask}`);
-    } catch (err) {
-        logVerbose(`Failed to set CPU affinity for PID ${pid} (expected for short-lived child processes)`);
-    }
-}
-
-// Electron spawns several child processes under the same exe (GPU process,
-// renderer(s), utility/network process, etc.) -- each is its own PID and
-// does NOT inherit affinity from the parent. Setting this on process.pid
-// alone only covers the main/browser process. This walks the whole
-// descendant tree of a given root PID and applies affinity to every
-// process found. (Priority is intentionally NOT touched here -- Electron
-// runs at whatever priority Windows assigns by default).
-function getChildPids(pid) {
-    try {
-        const out = execSync(
-            `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter 'ParentProcessId=${pid}' | Select-Object -ExpandProperty ProcessId"`
-        ).toString();
-        return out.split(/\r?\n/).map(s => s.trim()).filter(Boolean).map(Number);
-    } catch (err) {
-        logError(`Failed to enumerate children of PID ${pid}: ${err.message}`);
-        return [];
-    }
-}
-
-function applyAffinityToTree(rootPid) {
-    const seen = new Set();
-    const queue = [rootPid];
-    while (queue.length) {
-        const pid = queue.shift();
-        if (seen.has(pid)) continue;
-        seen.add(pid);
-        setProcessAffinity(pid, CPU_AFFINITY_MASK);
-        for (const childPid of getChildPids(pid)) {
-            queue.push(childPid);
-        }
-    }
-    logVerbose(`Applied affinity to process tree rooted at ${rootPid}: [${[...seen].join(', ')}]`);
-}
 
 process.on('uncaughtException', (err) => {
     logError(`UNCAUGHT EXCEPTION: ${err.stack || err.message}`);
@@ -221,7 +175,15 @@ function createWindow() {
         logVerbose('Window recovered from being unresponsive.');
     });
 
-    win.loadURL('http://localhost:5000');
+    win.webContents.on('did-fail-load', (e, code, desc, url) => {
+        if (url.startsWith('http://127.0.0.1:5000') || url.startsWith('http://localhost:5000')) {
+            setTimeout(() => {
+                if (win && !win.isDestroyed()) win.loadURL('http://127.0.0.1:5000');
+            }, 500);
+        }
+    });
+
+    win.loadURL('http://127.0.0.1:5000');
     win.setAlwaysOnTop(true, 'screen-saver');
 
     // No frame/menu bar means no built-in way to reload -- add a right-click
@@ -230,7 +192,7 @@ function createWindow() {
         const contextMenu = Menu.buildFromTemplate([
             {
                 label: 'Refresh',
-                click: () => win.loadURL('http://localhost:5000'),
+                click: () => win.loadURL('http://127.0.0.1:5000'),
             },
             {
                 label: 'Toggle DevTools',
@@ -296,22 +258,17 @@ function toggleInteraction() {
 // Limit overlay to 30 FPS to save resources for the game
 app.commandLine.appendSwitch('limit-fps', '30');
 
+// Disable hardware acceleration to prevent overlay from competing with games for GPU resources
+app.disableHardwareAcceleration();
+
 app.whenReady().then(() => {
     if (!gotSingleInstanceLock) return; // second instance -- already quitting
 
-    // Affinity applied immediately for the Electron main process -- hard
-    // constraint we always want active. Priority is intentionally left
-    // untouched -- Electron runs at whatever priority Windows assigns by
-    // default.
-    applyAffinityToTree(process.pid);
-
     launchNodeBackend();
 
-    setTimeout(() => {
-        createWindow();
-        globalShortcut.register('CommandOrControl+Alt+F9', toggleMasterLock);
-        globalShortcut.register('CommandOrControl+Alt+F7', toggleInteraction);
-    }, 1500);
+    createWindow();
+    globalShortcut.register('CommandOrControl+Alt+F9', toggleMasterLock);
+    globalShortcut.register('CommandOrControl+Alt+F7', toggleInteraction);
 });
 
 // Without this, Electron's default behavior on Windows/Linux is to quit

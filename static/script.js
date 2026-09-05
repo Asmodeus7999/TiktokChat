@@ -158,7 +158,7 @@ connectBtn.addEventListener('click', () => {
     // Reset stats, buffers, and DOM for the new connection
     stats = { viewers: 0, likes: 0, gifts: 0, joins: 0 };
     updateStats();
-    userLikesBuffer = {};
+    userLikesBuffer.clear();
     chatMessages.innerHTML = '';
     const likeFeed = document.getElementById('like-feed');
     const joinFeed = document.getElementById('join-feed');
@@ -251,7 +251,7 @@ socket.on('chatMessage', (data) => {
     addMessage(data);
 });
 
-let userLikesBuffer = {};
+let userLikesBuffer = new Map();
 const MAX_LIKE_BUFFER_FRONTEND = 3000;
 
 // Auto-fade the like/join feed columns independently, each after a few
@@ -292,14 +292,14 @@ function addMessage(data) {
 
         // Track cumulative likes per user and show at milestones: 1, 10, 25, 50
         const LIKE_MILESTONES = [1, 10, 25, 50];
-        const prev = userLikesBuffer[data.nickname] || 0;
+        const prev = userLikesBuffer.get(data.nickname) || 0;
         const next = prev + (data.likeCount || 1);
 
         // Purge buffer if it gets too large (popular stream with many unique viewers)
-        if (Object.keys(userLikesBuffer).length >= MAX_LIKE_BUFFER_FRONTEND) {
-            userLikesBuffer = {};
+        if (userLikesBuffer.size >= MAX_LIKE_BUFFER_FRONTEND) {
+            userLikesBuffer.clear();
         }
-        userLikesBuffer[data.nickname] = next;
+        userLikesBuffer.set(data.nickname, next);
 
         // Find if we crossed any milestone between prev and next
         const crossed = LIKE_MILESTONES.filter(m => prev < m && next >= m);

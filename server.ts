@@ -62,10 +62,7 @@ export function startServer(baseDir: string) {
         currentSession.generation += 1;
     }
 
-    // Tracks cumulative likes per viewer for milestone display.
-    // Capped at 5000 entries to prevent unbounded growth on popular streams.
-    const MAX_LIKE_BUFFER = 5000;
-    const userLikesBuffer: Record<string, number> = {};
+
 
     function startTiktokClient(username: string, generation: number) {
         try {
@@ -114,13 +111,6 @@ export function startServer(baseDir: string) {
 
             tiktokLiveConnection.on('like', (data: any) => {
                 if (!isCurrent()) return;
-                // Track cumulative likes per user, purge buffer if too large
-                const nick = data.nickname || data.user?.nickname || data.user?.uniqueId || 'User';
-                if (Object.keys(userLikesBuffer).length >= MAX_LIKE_BUFFER) {
-                    // Remove oldest 20% of entries to make room
-                    const keys = Object.keys(userLikesBuffer);
-                    keys.slice(0, Math.floor(MAX_LIKE_BUFFER * 0.2)).forEach(k => delete userLikesBuffer[k]);
-                }
                 io.emit('chatMessage', {
                     type: 'like',
                     nickname: data.nickname || data.user?.nickname || data.user?.uniqueId || 'User',
@@ -241,13 +231,30 @@ export function startServer(baseDir: string) {
                 io.emit('status', { connected: false, error: (err as any).message || String(err) });
             });
 
-            liveChat.start().then(ok => {
-                if (!ok) {
-                    console.error('YouTube LiveChat failed to start');
-                    io.emit('status', { connected: false, error: 'Failed to connect to YouTube Live. Is the stream live?' });
+            const attemptStart = async (retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    if (!isCurrent()) return false;
+                    try {
+                        const ok = await liveChat.start();
+                        if (ok) return true;
+                    } catch (e) {
+                        console.error(`YouTube LiveChat start attempt ${i + 1} failed:`, e);
+                    }
+                    if (i < retries - 1) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+                return false;
+            };
+
+            attemptStart().then(ok => {
+                if (!ok && isCurrent()) {
+                    console.error('YouTube LiveChat failed to start after retries');
+                    io.emit('status', { connected: false, error: 'Failed to connect to YouTube Live. Is the stream live? (Try connecting again)' });
                 }
             }).catch((e: any) => {
-                console.error('YouTube LiveChat start error:', e);
+                if (!isCurrent()) return;
+                console.error('YouTube LiveChat unexpected error:', e);
                 io.emit('status', { connected: false, error: e.message || String(e) });
             });
 
@@ -257,7 +264,15 @@ export function startServer(baseDir: string) {
         }
     }
 
+    let idleTimeout: NodeJS.Timeout | null = null;
+    const IDLE_TIMEOUT_MS = 10000;
+
     io.on('connection', (socket) => {
+        if (idleTimeout) {
+            clearTimeout(idleTimeout);
+            idleTimeout = null;
+        }
+
         socket.on('connect_stream', (data) => {
             const platform = data.platform || 'tiktok';
             let identifier = data.username || data.videoId;
@@ -288,6 +303,15 @@ export function startServer(baseDir: string) {
 
         socket.on('disconnect', () => {
             console.log("Browser disconnected.");
+            
+            const clients = io.engine.clientsCount;
+            if (clients === 0) {
+                console.log(`No clients connected. Starting ${IDLE_TIMEOUT_MS}ms idle timeout...`);
+                idleTimeout = setTimeout(() => {
+                    console.log("Idle timeout reached. Disconnecting stream client.");
+                    disconnectAll();
+                }, IDLE_TIMEOUT_MS);
+            }
         });
     });
 

@@ -623,6 +623,8 @@ kbd {
     background: var(--msg-bg);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
 }
 
 .event-box.like {
@@ -652,6 +654,9 @@ kbd {
     background: var(--msg-bg);
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    transform: translateX(50px);
+    animation: slideFromRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.2) forwards;
 }
 
 .message.gift {
@@ -671,10 +676,16 @@ kbd {
     border: 1px solid rgba(255, 60, 100, 0.5);
 }
 
-@keyframes slideIn {
+@keyframes fadeIn {
     to {
         opacity: 1;
-        transform: translateY(0);
+    }
+}
+
+@keyframes slideFromRight {
+    to {
+        opacity: 1;
+        transform: translateX(0);
     }
 }
 
