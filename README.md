@@ -65,9 +65,9 @@ The overlay starts **unlocked** — you'll see a red drag bar and dashed border 
 
 | Shortcut | Action |
 |---|---|
-| `Ctrl+Alt+F9` | Toggle lock. Locked = click-through (mouse passes through to whatever's behind it, e.g. your game), drag bar/border hidden. Unlocked = draggable/resizable. |
-| `Ctrl+Alt+F7` | While locked, toggle click-through on/off without fully unlocking — lets you briefly interact with the overlay (e.g. scroll chat) then pass mouse input through again. |
-| Right-click | Opens a menu with **Refresh** and **Toggle DevTools**. Only works while unlocked or briefly interactive via `Ctrl+Alt+F7`. |
+| `Ctrl+Alt+L` | Toggle lock. Locked = click-through (mouse passes through to whatever's behind it, e.g. your game), drag bar/border hidden. Unlocked = draggable/resizable. |
+| `Ctrl+Alt+I` | While locked, toggle click-through on/off without fully unlocking — lets you briefly interact with the overlay (e.g. scroll chat) then pass mouse input through again. |
+| Right-click | Opens a menu with **Refresh** and **Toggle DevTools**. Only works while unlocked or briefly interactive via `Ctrl+Alt+I`. |
 
 ## License
 

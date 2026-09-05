@@ -43,26 +43,40 @@ const platformRadios = document.getElementsByName('platform');
 const identifierLabel = document.getElementById('identifier-label');
 const identifierPrefix = document.getElementById('identifier-prefix');
 
+const platformValues = {
+    tiktok: '',
+    youtube: ''
+};
+let currentPlatform = 'tiktok';
+
 // Platform switch logic
 if (platformRadios) {
     platformRadios.forEach(radio => {
         radio.addEventListener('change', (e) => {
+            // Save value of previous platform
+            platformValues[currentPlatform] = usernameInput.value;
+
             const platform = e.target.value;
+            currentPlatform = platform;
+
             if (platform === 'youtube') {
                 identifierLabel.textContent = 'YouTube Video URL or ID';
                 identifierPrefix.style.display = 'none';
                 usernameInput.placeholder = 'https://youtube.com/watch?v=...';
-                usernameInput.style.paddingLeft = '16px';
+                usernameInput.style.paddingLeft = '0.85rem';
                 if (toggleSessionBtn) toggleSessionBtn.classList.add('hidden');
                 if (sessionIdSection) sessionIdSection.classList.add('hidden');
             } else {
                 identifierLabel.textContent = 'TikTok Username';
-                identifierPrefix.style.display = 'flex';
+                identifierPrefix.style.display = '';
                 usernameInput.placeholder = 'yourusername';
-                usernameInput.style.paddingLeft = '36px';
+                usernameInput.style.paddingLeft = '0';
                 if (toggleSessionBtn) toggleSessionBtn.classList.remove('hidden');
                 // Don't auto-show sessionIdSection, let user toggle it
             }
+
+            // Restore saved input for target platform
+            usernameInput.value = platformValues[platform] || '';
         });
     });
 }
@@ -138,9 +152,12 @@ connectBtn.addEventListener('click', () => {
     const sessionid = sessionIdInput ? sessionIdInput.value.trim() : '';
     const targetIdc = getTargetIdc();
 
-    statusMessage.textContent = 'Connecting...';
+    statusMessage.textContent = '';
     statusMessage.style.color = 'var(--text-secondary)';
     connectBtn.disabled = true;
+    if (platformRadios) {
+        platformRadios.forEach(radio => radio.disabled = true);
+    }
     connectBtnText.textContent = 'Connecting...';
     connectBtnSpinner.classList.remove('hidden');
 
@@ -179,6 +196,9 @@ usernameInput.addEventListener('keypress', (e) => {
 
 // Socket Events
 socket.on('status', (data) => {
+    if (platformRadios) {
+        platformRadios.forEach(radio => radio.disabled = false);
+    }
     if (data.connected) {
         setupContainer.classList.add('hidden');
         chatContainer.classList.remove('hidden');
@@ -318,11 +338,25 @@ function addMessage(data) {
         const followIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2be07a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:4px;"><path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="8" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>`;
         contentHtml = `<span class="comment" style="color: #2be07a; font-style: italic;">${followIcon}Started following!</span>`;
     } else if (data.type === 'chat') {
-        contentHtml = `<span class="comment">${escapeHtml(data.comment)}</span>`;
+        if (data.commentParts && Array.isArray(data.commentParts) && data.commentParts.length > 0) {
+            const partsHtml = data.commentParts.map(part => {
+                if (part.emoteUrl && isSafeImageUrl(part.emoteUrl)) {
+                    return `<img src="${part.emoteUrl}" class="chat-emote" alt="${escapeHtml(part.alt || '')}" title="${escapeHtml(part.alt || '')}">`;
+                } else if (part.text) {
+                    return escapeHtml(part.text);
+                }
+                return '';
+            }).join('');
+            contentHtml = `<span class="comment">${partsHtml}</span>`;
+        } else {
+            contentHtml = `<span class="comment">${escapeHtml(data.comment)}</span>`;
+        }
     } else if (data.type === 'gift') {
         stats.gifts += parseInt(data.repeatCount) || 1;
         updateStats();
-        playGiftSound();
+        if (chatContainer && !chatContainer.classList.contains('hidden')) {
+            playGiftSound();
+        }
         const giftIconHtml = (data.giftIconUrl && isSafeImageUrl(data.giftIconUrl))
             ? `<img src="${data.giftIconUrl}" class="gift-icon" onerror="this.style.display='none'">`
             : '<span class="gift-icon-emoji">🎁</span>';

@@ -1,27 +1,19 @@
-const { app, BrowserWindow, globalShortcut, Menu, dialog, screen } = require('electron');
-const { spawn, execSync } = require('child_process');
+const { app, BrowserWindow, globalShortcut, Menu, Tray, nativeImage, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let win;
+let tray = null;
 let isLocked = false;
 let isClickThrough = false;
 let isQuitting = false;
-let backendProcess = null;
 
-// Prevents launching a second copy of the app. Without this, a double
-// double-click (or a stray leftover instance from a crash) would spawn a
-// second node server trying to bind the same port 5000 -- the second one
-// fails, and you're left with two overlay windows or a broken one with no
-// clear reason why.
+// Prevents launching a second copy of the app.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
     app.quit();
 } else {
     app.on('second-instance', () => {
-        // Someone tried to launch a second instance -- bring the existing
-        // window to the front instead of doing nothing (or worse, silently
-        // failing).
         if (win) {
             if (win.isMinimized()) win.restore();
             win.show();
@@ -30,18 +22,11 @@ if (!gotSingleInstanceLock) {
     });
 }
 
-// Writes to a file since GUI-subsystem Electron apps don't print console.log
-// to a terminal. Off by default -- only errors get logged so this doesn't
-// grow forever during normal use. To re-enable full step-by-step tracing
-// later (e.g. debugging a new issue), create an empty file named
-// "enable-debug" next to main.js (or in resources/ when packaged).
 const LOG_PATH = path.join(app.getPath('userData'), 'debug.log');
 const VERBOSE = fs.existsSync(path.join(app.isPackaged ? process.resourcesPath : __dirname, 'enable-debug'));
 
-// Remembers window position/size across launches so the user doesn't have
-// to drag/resize it every time.
 const BOUNDS_PATH = path.join(app.getPath('userData'), 'window-bounds.json');
-const DEFAULT_BOUNDS = { width: 400, height: 800 }; // no x/y -- let Electron center it the first time ever
+const DEFAULT_BOUNDS = { width: 400, height: 800 };
 
 function loadWindowBounds() {
     try {
@@ -55,7 +40,7 @@ function loadWindowBounds() {
             return bounds;
         }
     } catch (e) {
-        // No saved bounds yet (first ever launch) or file is corrupt -- fall back to default
+        // No saved bounds
     }
     return DEFAULT_BOUNDS;
 }
@@ -69,20 +54,14 @@ function saveWindowBounds() {
     }
 }
 
-// Loads saved bounds and checks the saved x/y is still within some
-// currently connected display -- e.g. if the window was last on a second
-// monitor that's since been unplugged, restoring that x/y would put the
-// window off-screen and unreachable. Falls back to just width/height
-// (Electron centers it) if the saved position is no longer valid.
 function getValidatedWindowBounds() {
     const bounds = loadWindowBounds();
     if (typeof bounds.x !== 'number' || typeof bounds.y !== 'number') {
-        return bounds; // no saved position (first launch) -- nothing to validate
+        return bounds;
     }
 
     const displays = screen.getAllDisplays();
     const fitsOnSomeDisplay = displays.some(({ workArea }) => {
-        // Require at least a corner of the window to be visible on this display
         return (
             bounds.x < workArea.x + workArea.width &&
             bounds.x + bounds.width > workArea.x &&
@@ -93,7 +72,7 @@ function getValidatedWindowBounds() {
 
     if (fitsOnSomeDisplay) return bounds;
 
-    logVerbose('Saved window position is off-screen (display changed) -- falling back to centered default.');
+    logVerbose('Saved window position is off-screen -- falling back to centered default.');
     return { width: bounds.width, height: bounds.height };
 }
 
@@ -102,14 +81,11 @@ function logError(msg) {
     try {
         fs.appendFileSync(LOG_PATH, line);
     } catch (e) {
-        // Ignore if userData dir isn't ready yet
     }
 }
 function logVerbose(msg) {
     if (VERBOSE) logError(msg);
 }
-
-
 
 process.on('uncaughtException', (err) => {
     logError(`UNCAUGHT EXCEPTION: ${err.stack || err.message}`);
@@ -130,11 +106,47 @@ function launchNodeBackend() {
     }
 }
 
+function applyLockState() {
+    if (!win || win.isDestroyed()) return;
+
+    if (isLocked) {
+        isClickThrough = true;
+        win.setIgnoreMouseEvents(true, { forward: true });
+        win.webContents.executeJavaScript(`
+            (function() {
+                const bar = document.getElementById('overlay-drag-bar');
+                if (bar) bar.style.display = 'none';
+                const border = document.getElementById('overlay-border');
+                if (border) border.style.display = 'none';
+                document.body.style.paddingTop = '0px';
+            })();
+        `).catch(err => logError(`Lock JS error: ${err.message}`));
+    } else {
+        isClickThrough = false;
+        // On Windows, explicitly reset mouse ignore and restore window focus
+        win.setIgnoreMouseEvents(false);
+        win.setAlwaysOnTop(true, 'screen-saver');
+        win.show();
+        win.focus();
+        win.webContents.executeJavaScript(`
+            (function() {
+                const bar = document.getElementById('overlay-drag-bar');
+                if (bar) bar.style.display = 'flex';
+                const border = document.getElementById('overlay-border');
+                if (border) border.style.display = 'block';
+                document.body.style.paddingTop = '30px';
+            })();
+        `).catch(err => logError(`Unlock JS error: ${err.message}`));
+    }
+
+    updateTrayMenu();
+}
+
 function createWindow() {
     const bounds = getValidatedWindowBounds();
 
     win = new BrowserWindow({
-        ...bounds, // spreads width, height, and x/y if we have a saved position
+        ...bounds,
         transparent: true,
         frame: false,
         alwaysOnTop: true,
@@ -142,15 +154,10 @@ function createWindow() {
         webPreferences: { contextIsolation: true }
     });
 
-    // Save whenever the user finishes dragging or resizing, and once more
-    // on close as a safety net in case the last change didn't get caught.
     win.on('moved', saveWindowBounds);
     win.on('resized', saveWindowBounds);
     win.on('close', saveWindowBounds);
 
-    // If the Chromium renderer crashes (GPU driver issue, OOM, etc.) the
-    // window would otherwise just sit there blank forever with no way to
-    // recover short of a full app relaunch. Recreate it automatically.
     win.webContents.on('render-process-gone', (event, details) => {
         logError(`Renderer process gone: reason=${details.reason}, exitCode=${details.exitCode}`);
         if (isQuitting) return;
@@ -159,15 +166,11 @@ function createWindow() {
         try {
             if (oldWin && !oldWin.isDestroyed()) oldWin.destroy();
         } catch (e) {
-            // Ignore -- already gone
         }
         logVerbose('Recreating window after renderer crash...');
         createWindow();
     });
 
-    // Renderer went unresponsive (hung script, deadlock, etc.). Don't
-    // auto-kill it -- it may recover -- but log it so it's visible in
-    // debug.log if the user reports the app "freezing".
     win.on('unresponsive', () => {
         logError('Window became unresponsive.');
     });
@@ -186,10 +189,12 @@ function createWindow() {
     win.loadURL('http://127.0.0.1:5000');
     win.setAlwaysOnTop(true, 'screen-saver');
 
-    // No frame/menu bar means no built-in way to reload -- add a right-click
-    // context menu as the only way to trigger it.
     win.webContents.on('context-menu', () => {
         const contextMenu = Menu.buildFromTemplate([
+            {
+                label: isLocked ? 'Unlock Overlay (Ctrl+Alt+L)' : 'Lock Overlay (Ctrl+Alt+L)',
+                click: () => toggleMasterLock(),
+            },
             {
                 label: 'Refresh',
                 click: () => win.loadURL('http://127.0.0.1:5000'),
@@ -213,35 +218,18 @@ function createWindow() {
                 
                 const border = document.createElement('div');
                 border.id = 'overlay-border';
-                border.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: 3px dashed red; box-sizing: border-box; z-index: 999998; pointer-events: none;';
+                border.style.cssText = 'position: fixed; top: 30px; left: 0; width: 100%; height: calc(100% - 30px); border: 3px dashed red; box-sizing: border-box; z-index: 999998; pointer-events: none;';
                 document.body.appendChild(border);
             }
-        `);
-
-        // Page has finished loading. Affinity is already active (set at
-        // spawn time). Priority is intentionally left at whatever Windows
-        // assigns by default for the Electron process.
+        `).then(() => {
+            applyLockState();
+        }).catch(err => logError(`did-finish-load error: ${err.message}`));
     });
 }
 
 function toggleMasterLock() {
     isLocked = !isLocked;
-
-    if (isLocked) {
-        isClickThrough = true;
-        win.setIgnoreMouseEvents(true, { forward: true });
-        win.webContents.executeJavaScript(`
-            document.getElementById('overlay-drag-bar').style.display = 'none';
-            document.getElementById('overlay-border').style.display = 'none';
-        `);
-    } else {
-        isClickThrough = false;
-        win.setIgnoreMouseEvents(false);
-        win.webContents.executeJavaScript(`
-            document.getElementById('overlay-drag-bar').style.display = 'flex';
-            document.getElementById('overlay-border').style.display = 'block';
-        `);
-    }
+    applyLockState();
 }
 
 function toggleInteraction() {
@@ -252,35 +240,109 @@ function toggleInteraction() {
         win.setIgnoreMouseEvents(true, { forward: true });
     } else {
         win.setIgnoreMouseEvents(false);
+        win.focus();
     }
+    updateTrayMenu();
 }
 
-// Limit overlay to 30 FPS to save resources for the game
-app.commandLine.appendSwitch('limit-fps', '30');
+function setupTray() {
+    const iconPath = path.join(__dirname, 'static', 'app-icon.ico');
+    const fallbackPath = path.join(__dirname, 'build', 'icon.ico');
+    let trayIcon;
 
-// Disable hardware acceleration to prevent overlay from competing with games for GPU resources
+    if (fs.existsSync(iconPath)) {
+        trayIcon = nativeImage.createFromPath(iconPath);
+    } else if (fs.existsSync(fallbackPath)) {
+        trayIcon = nativeImage.createFromPath(fallbackPath);
+    } else {
+        trayIcon = nativeImage.createEmpty();
+    }
+
+    tray = new Tray(trayIcon);
+    tray.setToolTip('StreamChat Overlay');
+    tray.on('click', () => {
+        if (tray) tray.popUpContextMenu();
+    });
+    updateTrayMenu();
+}
+
+function updateTrayMenu() {
+    if (!tray) return;
+
+    const contextMenu = Menu.buildFromTemplate([
+        {
+            label: isLocked ? '🔒 Overlay: LOCKED (Click to Unlock)' : '🔓 Overlay: UNLOCKED (Click to Lock)',
+            click: () => toggleMasterLock()
+        },
+        {
+            label: 'Hotkey: Ctrl+Alt+L',
+            enabled: false
+        },
+        { type: 'separator' },
+        {
+            label: isClickThrough ? '🖱️ Mouse: Click-Through ON' : '🖱️ Mouse: Click-Through OFF',
+            click: () => toggleInteraction(),
+            enabled: isLocked
+        },
+        {
+            label: 'Refresh Overlay',
+            click: () => {
+                if (win && !win.isDestroyed()) win.loadURL('http://127.0.0.1:5000');
+            }
+        },
+        { type: 'separator' },
+        {
+            label: 'Exit StreamChat',
+            click: () => {
+                isQuitting = true;
+                app.quit();
+            }
+        }
+    ]);
+
+    tray.setContextMenu(contextMenu);
+}
+
+app.commandLine.appendSwitch('limit-fps', '30');
 app.disableHardwareAcceleration();
 
+app.commandLine.appendSwitch('disable-http-cache');
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disk-cache-size', '1');
+app.commandLine.appendSwitch('media-cache-size', '1');
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('disable-sync');
+app.commandLine.appendSwitch('disable-extensions');
+app.commandLine.appendSwitch('no-first-run');
+
 app.whenReady().then(() => {
-    if (!gotSingleInstanceLock) return; // second instance -- already quitting
+    if (!gotSingleInstanceLock) return;
 
     launchNodeBackend();
-
     createWindow();
-    globalShortcut.register('CommandOrControl+Alt+F9', toggleMasterLock);
-    globalShortcut.register('CommandOrControl+Alt+F7', toggleInteraction);
+    setupTray();
+
+    const lockShortcuts = ['CommandOrControl+Alt+L'];
+    lockShortcuts.forEach(sc => {
+        const ok = globalShortcut.register(sc, toggleMasterLock);
+        if (ok) logVerbose(`Registered lock shortcut: ${sc}`);
+        else logError(`Failed to register lock shortcut: ${sc}`);
+    });
+
+    const interactShortcuts = ['CommandOrControl+Alt+I'];
+    interactShortcuts.forEach(sc => {
+        const ok = globalShortcut.register(sc, toggleInteraction);
+        if (ok) logVerbose(`Registered interact shortcut: ${sc}`);
+        else logError(`Failed to register interact shortcut: ${sc}`);
+    });
 });
 
-// Without this, Electron's default behavior on Windows/Linux is to quit
-// the whole app the instant all windows close -- which would trigger the
-// will-quit handler below and kill the backend prematurely if the window
-// ever closes/crashes unexpectedly.
 app.on('window-all-closed', () => {
     logVerbose("All windows closed -- quitting app.");
     app.quit();
 });
 
-// 🚨 GRACEFUL SHUTDOWN HANDLER
 app.on('will-quit', () => {
     globalShortcut.unregisterAll();
 });

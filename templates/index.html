@@ -128,8 +128,13 @@
 
             <!-- Connect Button -->
             <button id="connect-btn">
+                <span id="connect-btn-spinner" class="hidden">
+                    <svg class="spinner-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="spinner-track" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25"></circle>
+                        <path class="spinner-path" d="M12 2A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path>
+                    </svg>
+                </span>
                 <span id="connect-btn-text">Connect to Live</span>
-                <span id="connect-btn-spinner" class="hidden">⟳</span>
             </button>
             <p id="status-message"></p>
         </div>

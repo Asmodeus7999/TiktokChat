@@ -2,8 +2,6 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
-const { TikTokLiveConnection } = require('tiktok-live-connector');
-import { LiveChat } from 'youtube-chat';
 
 export function startServer(baseDir: string) {
     const app = express();
@@ -66,6 +64,7 @@ export function startServer(baseDir: string) {
 
     function startTiktokClient(username: string, generation: number) {
         try {
+            const { TikTokLiveConnection } = require('tiktok-live-connector');
             const tiktokLiveConnection = new TikTokLiveConnection(username, {});
             
             currentSession.client = tiktokLiveConnection;
@@ -175,6 +174,7 @@ export function startServer(baseDir: string) {
                 id = match[1];
             }
 
+            const { LiveChat } = require('youtube-chat');
             const liveChat = new LiveChat({ liveId: id });
             
             currentSession.client = liveChat;
@@ -192,12 +192,23 @@ export function startServer(baseDir: string) {
             liveChat.on('chat', (chatItem) => {
                 if (!isCurrent()) return;
                 
-                // parse message text
-                let text = '';
+                // parse message text & emotes
+                let rawText = '';
+                const commentParts: Array<{ text?: string; emoteUrl?: string; alt?: string }> = [];
                 if (chatItem.message) {
                     for (const run of chatItem.message) {
-                        if ((run as any).text) text += (run as any).text;
-                        else if ((run as any).emojiText) text += (run as any).emojiText;
+                        const r = run as any;
+                        if (r.url) {
+                            const altText = r.alt || r.emojiText || '';
+                            commentParts.push({ emoteUrl: r.url, alt: altText });
+                            rawText += altText;
+                        } else if (r.text) {
+                            commentParts.push({ text: r.text });
+                            rawText += r.text;
+                        } else if (r.emojiText) {
+                            commentParts.push({ text: r.emojiText });
+                            rawText += r.emojiText;
+                        }
                     }
                 }
 
@@ -213,7 +224,8 @@ export function startServer(baseDir: string) {
                     io.emit('chatMessage', {
                         type: 'chat',
                         nickname: chatItem.author.name,
-                        comment: text,
+                        comment: rawText,
+                        commentParts: commentParts,
                         profilePictureUrl: chatItem.author.thumbnail ? chatItem.author.thumbnail.url : ''
                     });
                 }

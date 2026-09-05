@@ -155,6 +155,12 @@ body {
     color: #ffffff;
 }
 
+.platform-selector input[type="radio"]:disabled+.platform-btn {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* Field groups */
 .field-group {
     display: flex;
@@ -216,8 +222,8 @@ body {
 }
 
 .input-prefix {
-    padding: 0 0.6rem 0 0.85rem;
-    font-size: 1rem;
+    padding: 0 0.15rem 0 0.85rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-secondary);
     user-select: none;
@@ -476,6 +482,7 @@ kbd {
 
 /* Connect Button */
 #connect-btn {
+    position: relative;
     width: 100%;
     padding: 0.85rem;
     background: linear-gradient(135deg, #ff0050, #e00045);
@@ -487,18 +494,19 @@ kbd {
     font-weight: 700;
     cursor: pointer;
     letter-spacing: 0.02em;
-    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 4px 20px rgba(255, 0, 80, 0.35);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
     margin-top: 0.25rem;
+    overflow: hidden;
 }
 
 #connect-btn:hover:not(:disabled) {
-    opacity: 0.9;
-    box-shadow: 0 6px 28px rgba(255, 0, 80, 0.5);
+    opacity: 0.95;
+    box-shadow: 0 6px 28px rgba(255, 0, 80, 0.55);
     transform: translateY(-1px);
 }
 
@@ -507,21 +515,45 @@ kbd {
 }
 
 #connect-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.85;
     cursor: not-allowed;
+    background: linear-gradient(135deg, #990033, #660022);
+    box-shadow: 0 4px 20px rgba(153, 0, 51, 0.4);
+    animation: buttonConnectingPulse 1.6s infinite ease-in-out;
+}
+
+@keyframes buttonConnectingPulse {
+    0% {
+        box-shadow: 0 0 12px rgba(255, 0, 80, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 24px rgba(255, 0, 80, 0.65), 0 0 8px rgba(255, 255, 255, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 12px rgba(255, 0, 80, 0.25);
+    }
 }
 
 #connect-btn-spinner {
-    animation: spin 0.8s linear infinite;
-    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.spinner-svg {
+    width: 20px;
+    height: 20px;
+    animation: spin 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
 }
 
 @keyframes spin {
-    from {
+    0% {
         transform: rotate(0deg);
     }
-
-    to {
+    100% {
         transform: rotate(360deg);
     }
 }
@@ -716,6 +748,16 @@ kbd {
     word-break: break-word;
     color: #ffffff;
     text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.chat-emote {
+    height: 1.35em;
+    width: auto;
+    max-height: 28px;
+    vertical-align: -0.22em;
+    display: inline-block;
+    margin: 0 2px;
+    object-fit: contain;
 }
 
 .gift-icon-wrapper {

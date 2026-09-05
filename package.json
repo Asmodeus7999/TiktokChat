@@ -9,7 +9,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron .",
     "dev": "electron .",
-    "build:ts": "tsc",
+    "build:ts": "npx esbuild server.ts --bundle --platform=node --target=node18 --outfile=dist-ts/server.js --external:tiktok-live-connector --external:youtube-chat",
     "dist": "npm run build:ts && electron-builder --dir",
     "postinstall": "patch-package"
   },
@@ -51,6 +51,7 @@
     "@types/node": "^26.4.1",
     "electron": "^44.2.0",
     "electron-builder": "^26.15.3",
+    "esbuild": "^0.25.0",
     "patch-package": "^8.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2"
