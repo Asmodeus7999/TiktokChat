@@ -16,7 +16,7 @@
   "build": {
     "appId": "com.asmodeus.streamchat",
     "productName": "StreamChat",
-    "asar": false,
+    "asar": true,
     "electronLanguages": [
       "en-US"
     ],
