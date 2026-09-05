@@ -7,6 +7,7 @@ A real-time chat overlay for **TikTok Live** and **YouTube Live**, made for OBS.
 
 - Shows live chat from **TikTok** or **YouTube** streams in real-time
 - Works out of the box with public streams — no login required
+- Features smooth UI animations and automatic connection retries for stability
 - Has a transparent, styled UI that drops straight into OBS as a Browser Source or runs as a standalone floating overlay window
 - **TikTok**: shows chat, gifts (with CDN icons), follows, joins, and likes with live viewer and like counts
 - **YouTube**: shows live chat and Super Chats (displayed as gifts), with a clean chat-only layout
@@ -29,12 +30,12 @@ A real-time chat overlay for **TikTok Live** and **YouTube Live**, made for OBS.
    npm run start
    ```
 
-That's it — starts at `http://localhost:5000` under the hood.
+That's it — starts at `http://127.0.0.1:5000` under the hood.
 
 ## How to use it in OBS
 
 1. Add a **Browser Source** to your scene in OBS.
-2. Point it at `http://localhost:5000`.
+2. Point it at `http://127.0.0.1:5000`.
 3. Set the width/height to match your layout (400×800 is a good starting point).
 4. Select your platform (**TikTok** or **YouTube**), enter your stream info, and hit **Connect to Live**.
 5. The setup screen fades out and you're left with just the chat feed.
